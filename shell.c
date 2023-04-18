@@ -75,16 +75,23 @@ char *read_script(void) {
         perror("getline");
         return NULL;
     }
+    char *hash_pos = strchr(line, '#'); // don't want comments to be executed
+    if (hash_pos != NULL) {
+        *hash_pos = '\0';
+    } else {
+        free(hash_pos);
+    }
     line[res - 1] = '\0';
     return line;
 }
 
 
+// add ffliush(stdout); to the end of hist_print fxn
 int main(void)
 {
     // NOTE: "scripting" mode really just means reading from stdin
     //       and NOT printing a whole bunch of junk (including the prompt)
-    rl_startup_hook = readline_init;
+    // rl_startup_hook = readline_init;
     hist_init(100);
     char *command;
     while (true) 
@@ -93,14 +100,15 @@ int main(void)
         if (command == NULL) {
             break;
         }
-        LOG("input command: %s\n", command);
+        // LOG("input command: %s\n", command);
         hist_add(command);
 
         char *args[20] = {0};
         int tokens = 0;
         char *next_tok = command;
         char *curr_tok; 
-        while ((curr_tok = next_token(&next_tok, " \t\r\n")) != NULL) // tokenize command. ex: ls -l / => 'ls', 'l', '/', 'NULL'
+        // tokenize command. ex: ls -l / => 'ls', 'l', '/', 'NULL'
+        while ((curr_tok = next_token(&next_tok, " \t\r\n")) != NULL)
         {
             args[tokens++] = curr_tok;
             LOG("Token %02d: '%s'\n", tokens, curr_tok);
@@ -109,22 +117,23 @@ int main(void)
         if (args[0] == (char *) NULL) {
             continue;
         }
-        if (strcmp(args[0], "exit") == 0) {
+        else if (strcmp(args[0], "exit") == 0) {
             fprintf(stderr, "Have a great day, bye!\n");
             break;
         }
         // chdir system call
-        if (strcmp(args[0], "cd") == 0) {
-            chdir(args[1]);
+        else if (strcmp(args[0], "cd") == 0) {
+            if (args[1] == NULL) {
+                chdir(getenv("HOME"));
+            } else {
+                chdir(args[1]);
+            }
         }
-        // TODO:
-        // * history
-        // * ctrl+c not dying mode
-        // * logged in user
-        // * command line editing (autocomplete) => use readline library for this
-        // * more builtin functions (like cd)
-        // * redirect, piping
-        // * protecting ourselves from storms
+        // history
+        else if (strcmp(args[0], "history") == 0) {
+            hist_print();
+        }
+
         pid_t child = fork();
         if (child == -1) {
             perror("fork");
