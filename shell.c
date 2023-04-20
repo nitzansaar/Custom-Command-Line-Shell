@@ -35,12 +35,13 @@ int readline_init(void)
  *
  * Returns: char pointer to the next token in the string.
  */
+
 char *next_token(char **str_ptr, const char *delim)
 {
     if (*str_ptr == NULL) {
         return NULL;
     }
-    size_t tok_start = strspn(*str_ptr, delim);
+    size_t tok_start = strspn(*str_ptr, delim); // number of bytes in str_ptr
     size_t tok_end = strcspn(*str_ptr + tok_start, delim);
     /* Zero length token. We must be finished. */
     if (tok_end  == 0) {
@@ -67,26 +68,24 @@ char *next_token(char **str_ptr, const char *delim)
 }
 
 char *read_script(void) {
-    char *line = NULL;
+    char *line_ptr = NULL; // buffer for storing the line
     size_t line_sz = 0;
-    ssize_t res = getline(&line, &line_sz, stdin);
+    ssize_t res = getline(&line_ptr, &line_sz, stdin);
     if (res == -1) {
-        free(line);
+        free(line_ptr);
         perror("getline");
         return NULL;
     }
-    char *hash_pos = strchr(line, '#'); // don't want comments to be executed
+    char *hash_pos = strchr(line_ptr, '#'); // don't want comments to be executed
     if (hash_pos != NULL) {
-        *hash_pos = '\0';
+        *hash_pos = '\0'; // set to nullbyte so it won't be executed
     } else {
         free(hash_pos);
     }
-    line[res - 1] = '\0';
-    return line;
+    line_ptr[res - 1] = '\0'; // set last character to nullbyte
+    return line_ptr;
 }
 
-
-// add ffliush(stdout); to the end of hist_print fxn
 int main(void)
 {
     // NOTE: "scripting" mode really just means reading from stdin
@@ -100,20 +99,40 @@ int main(void)
         if (command == NULL) {
             break;
         }
+        if ('!' == command[0]) {
+            if (isdigit(command[1])) {
+                const char *res = hist_search_cnum(strtol(command + 1, NULL, 10));
+                if (res != NULL) {
+                    free(command);
+                    command = strdup(res);
+                } else {
+                    continue; 
+                }
+            } else if (isalpha(command[1])) {
+                const char *res = hist_search_prefix(command+1);
+                if (res != NULL) {
+                    free(command);
+                    command = strdup(res);
+                } else {
+                    continue; 
+                }
+            // } else if (command[1] == '!') {
+            //     int last_cnum = hist_last_cnum(); // what to do with this?
+            }
+        }
         // LOG("input command: %s\n", command);
-        hist_add(command);
-
         char *args[20] = {0};
         int tokens = 0;
         char *next_tok = command;
         char *curr_tok; 
+        char *og_tok = strdup(command); // need to save pointer to original token because command gets modified
         // tokenize command. ex: ls -l / => 'ls', 'l', '/', 'NULL'
         while ((curr_tok = next_token(&next_tok, " \t\r\n")) != NULL)
         {
             args[tokens++] = curr_tok;
             LOG("Token %02d: '%s'\n", tokens, curr_tok);
         }
-        args[tokens] = (char *) NULL;
+        args[tokens] = (char *) NULL; // set last arg to null
         if (args[0] == (char *) NULL) {
             continue;
         }
@@ -129,11 +148,11 @@ int main(void)
                 chdir(args[1]);
             }
         }
+        hist_add(og_tok);
         // history
-        else if (strcmp(args[0], "history") == 0) {
+        if (strcmp(args[0], "history") == 0) {
             hist_print();
         }
-
         pid_t child = fork();
         if (child == -1) {
             perror("fork");
