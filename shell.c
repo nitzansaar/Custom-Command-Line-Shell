@@ -14,6 +14,13 @@
 #include "history.h"
 #include "logger.h"
 
+
+struct command_line {
+    char **tokens;
+    bool stdout_pipe;
+    char *stdout_file;
+};
+
 int readline_init(void)
 {
     rl_variable_bind("show-all-if-ambiguous", "on");
@@ -66,6 +73,27 @@ char *next_token(char **str_ptr, const char *delim)
     }
     return current_ptr;
 }
+void execute_pipeline(struct command_line *cmds)
+{
+    for (int i = 0; i < 2; i++) { // want this to run twice. once for cat once for tr
+        int fd[2];
+        pipe(fd);
+        pid_t pid = fork();
+        if (pid == 0) { // children
+            dup2(fd[1], STDOUT_FILENO);
+            close(fd[0]);
+            execvp(cmds[i].tokens[0], cmds[i].tokens);
+        } else { // parent
+            dup2(fd[0], STDIN_FILENO);
+            close(fd[1]);
+        } 
+    }
+    if (!cmds[2].stdout_pipe) {
+        int output = open(cmds[2].stdout_file, O_CREAT | O_WRONLY, 0666);
+        dup2(output, STDOUT_FILENO); 
+        execvp(cmds[2].tokens[0], cmds[2].tokens);
+    }
+}
 
 char *read_script(void) {
     char *line_ptr = NULL; // buffer for storing the line
@@ -78,7 +106,7 @@ char *read_script(void) {
     }
     char *hash_pos = strchr(line_ptr, '#'); // don't want comments to be executed
     if (hash_pos != NULL) {
-        *hash_pos = '\0'; // set to nullbyte so it won't be executed
+        *hash_pos = '\0'; // set to nullbyte
     } else {
         free(hash_pos);
     }
@@ -90,9 +118,10 @@ int main(void)
 {
     // NOTE: "scripting" mode really just means reading from stdin
     //       and NOT printing a whole bunch of junk (including the prompt)
-    // rl_startup_hook = readline_init;
+    rl_startup_hook = readline_init;
     hist_init(100);
-    char *command;
+    char *command; //perhaps need to check isatty()?
+    
     while (true) 
     {
         command = read_script();
@@ -116,8 +145,15 @@ int main(void)
                 } else {
                     continue; 
                 }
-            // } else if (command[1] == '!') {
-            //     int last_cnum = hist_last_cnum(); // what to do with this?
+            } else if (command[1] == '!') {
+                int last_cnum = hist_last_cnum(); // what to do with this?
+                const char *res = hist_search_cnum(last_cnum);
+                if (res != NULL) {
+                    free(command);
+                    command = strdup(res);
+                } else {
+                    continue; 
+                }
             }
         }
         // LOG("input command: %s\n", command);
@@ -157,7 +193,7 @@ int main(void)
         if (child == -1) {
             perror("fork");
         } else if (child == 0) {
-            execvp(args[0], args); 
+            execvp(args[0], args); // call execute pipeline
             perror("exec");
             close(fileno(stdin));
             return EXIT_FAILURE;
