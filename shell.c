@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <limits.h>
 #include <locale.h>
 #include <pwd.h>
 #include <readline/readline.h>
@@ -19,6 +20,7 @@ struct command_line {
     char **tokens;
     bool stdout_pipe;
     char *stdout_file;
+    char *stdin_file;
 };
 
 int readline_init(void)
@@ -75,6 +77,7 @@ char *next_token(char **str_ptr, const char *delim)
 }
 void execute_pipeline(struct command_line *cmds)
 { 
+	LOG("exec: %s\n", cmds[0].tokens[0]);
     // while (command.stdoutpipe==true)
     int i = 0;
     while (cmds[i].stdout_pipe == true) { // needs to run for each each command
@@ -91,11 +94,12 @@ void execute_pipeline(struct command_line *cmds)
         } 
         i++;
     }
-    if (!cmds[i].stdout_pipe) { // last command
+    if (!cmds[i].stdout_file) {
         int output = open(cmds[i].stdout_file, O_CREAT | O_WRONLY, 0666); // is this correct?
         dup2(output, STDOUT_FILENO); 
-        execvp(cmds[2].tokens[0], cmds[i].tokens);
+	    LOGP("running\n");
     }
+    execvp(cmds[i].tokens[0], cmds[i].tokens);
 }
 
 char *read_script(void) {
@@ -126,7 +130,12 @@ int main(void)
     char *command; //need to check isatty() if a person -> allows to type if not just reads command
     while (true) 
     {
-        command = read_script();
+        if (isatty(STDIN_FILENO)) {
+            char *prompt = "The best prompt ever> ";
+            command = readline(prompt);
+        }else {
+            command = read_script();
+        }
         if (command == NULL) {
             break;
         }
@@ -159,53 +168,39 @@ int main(void)
             }
         }
         LOG("input command: %s\n", command);
-        char **args = calloc(32, sizeof(char*)); // initializes each elem to a null pointer
-        // new commands array for potential pipes
+        char *args[1024] = {0};
         int tokens = 0;
         char *next_tok = command;
         char *curr_tok; 
         char *og_tok = strdup(command); // need to save pointer to original token because command gets modified
-        // create a struct holding all the commands and pass that into execute pipeline
-        int commands = 0;
-        int max_pipes = 32;
-        struct command_line cmd_list[] = { 0 };
         // tokenize command. ex: ls -l / => 'ls', 'l', '/', 'NULL'
         while ((curr_tok = next_token(&next_tok, " \t\r\n")) != NULL) // handle for pipes
         {
-            // if (strcmp(curr_tok, "|") == 0) {
-            //     cmd_list[commands].tokens = &args[tokens - commands];
-            //     cmd_list[commands].stdout_pipe = true;
-            //     cmd_list[commands].stdout_file = NULL;
-            //     commands++;
-                
-            //     if (commands == max_cmds) { // resize
-            //         max_cmds *= 2;
-            //         cmd_list = (struct command_line *) realloc(cmd_list, max_cmds * sizeof(struct command_line));
-            //     }
-            // } else {
-                if (strcmp(curr_tok, "|") == 0) {
-                    tokens++;
-                } else {
-                    args[tokens] = curr_tok;
-                }
-            // }
+		    args[tokens++] = curr_tok;
+	    }
+	    args[tokens] = NULL;
+        struct command_line cmd_list[1024] = { 0 };
+        cmd_list[0].tokens = &args[0]; // set first command to mem address of the first token in case there is no pipes
+	    int commands = 0;
 
+	for (int i = 0; i < tokens; i++) {
+		if (strcmp(args[i], "|") == 0) {
+			// we need to create a new command
+			args[i] = NULL;
+			cmd_list[commands].stdout_pipe = true;
+			cmd_list[commands + 1].tokens = &args[i + 1];
+			commands++;
+        } else if (strcmp(args[i], "<") == 0) { // read input from a file
+            args[i] = NULL;
+            cmd_list[commands].stdin_file = args[i + 1];
+            i++; // skip the file name in the next iteration
+        } else if (strcmp(args[i], ">") == 0) { // write output to a file
+            args[i] = NULL;
+            cmd_list[commands].stdout_file = args[i + 1];
+            i++; // skip the file name in the next iteration
         }
-        LOG("%s\n", args[0]);
-        for (int i = 0; i < tokens; i++) {
-                cmd_list[commands].tokens = &args[i];
-                cmd_list[commands].stdout_pipe = true;
-                cmd_list[commands].stdout_file = NULL;
-                commands++;
-            
-        }
-        // last command
-        cmd_list[commands].tokens = &args[tokens - commands];
-        cmd_list[commands].stdout_pipe = false;
-        cmd_list[commands].stdout_file = args[tokens - 1]; // the very last token
+	}
 
-        commands++;
-        args[tokens] = (char *) NULL; // set last arg to null
         if (args[0] == (char *) NULL) { //blank command
             continue;
         }
@@ -221,7 +216,7 @@ int main(void)
                 chdir(args[1]); // go to specified directory, i think it isn't working
             }
         }
-        LOG("og command: %s\n", og_tok);
+        // LOG("og command: %s\n", og_tok);
         hist_add(og_tok);
         // history --- want to print after we added all tokens
         if (strcmp(args[0], "history") == 0) {
@@ -232,7 +227,6 @@ int main(void)
         if (child == -1) {
             perror("fork");
         } else if (child == 0) { // child is always 0
-            // execvp(args[0], args); // call execute pipeline instead to handle piping
             execute_pipeline(cmd_list);
             perror("exec");
             close(fileno(stdin));
