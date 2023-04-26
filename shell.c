@@ -14,13 +14,14 @@
 #include <unistd.h>
 #include "history.h"
 #include "logger.h"
-
+#include <signal.h>
 
 struct command_line {
     char **tokens;
     bool stdout_pipe;
     char *stdout_file;
     char *stdin_file;
+    bool stdout_append;;
 };
 
 int readline_init(void)
@@ -76,11 +77,10 @@ char *next_token(char **str_ptr, const char *delim)
     return current_ptr;
 }
 void execute_pipeline(struct command_line *cmds)
-{ 
-	LOG("exec: %s\n", cmds[0].tokens[0]);
-    // while (command.stdoutpipe==true)
+{
+    LOG("exec: %s\n", cmds[0].tokens[0]);
     int i = 0;
-    while (cmds[i].stdout_pipe == true) { // needs to run for each each command
+    while (cmds[i].stdout_pipe == true) { // needs to run for each command
         int fd[2];
         pipe(fd);
         pid_t pid = fork();
@@ -91,16 +91,29 @@ void execute_pipeline(struct command_line *cmds)
         } else { // parent
             dup2(fd[0], STDIN_FILENO);
             close(fd[1]);
-        } 
+        }
         i++;
     }
-    if (!cmds[i].stdout_file) {
-        int output = open(cmds[i].stdout_file, O_CREAT | O_WRONLY, 0666); // is this correct?
-        dup2(output, STDOUT_FILENO); 
-	    LOGP("running\n");
+
+    if (cmds[i].stdout_append) {
+        int output = open(cmds[i].stdout_file, O_CREAT | O_WRONLY | O_APPEND, 0666);
+        dup2(output, STDOUT_FILENO);
+        close(output);
+    } else if (cmds[i].stdout_file) {
+        int output = open(cmds[i].stdout_file, O_CREAT | O_WRONLY | O_TRUNC, 0666);
+        dup2(output, STDOUT_FILENO);
+        close(output);
     }
+
+    if (cmds[i].stdin_file) {
+        int input = open(cmds[i].stdin_file, O_RDONLY);
+        dup2(input, STDIN_FILENO);
+        close(input);
+    }
+
     execvp(cmds[i].tokens[0], cmds[i].tokens);
 }
+
 
 char *read_script(void) {
     char *line_ptr = NULL; // buffer(temporary storage) for storing the line
@@ -125,13 +138,27 @@ int main(void)
 {
     // NOTE: "scripting" mode really just means reading from stdin
     //       and NOT printing a whole bunch of junk (including the prompt)
+    signal(SIGINT, SIG_IGN);
     rl_startup_hook = readline_init;
     hist_init(100);
     char *command; //need to check isatty() if a person -> allows to type if not just reads command
     while (true) 
     {
         if (isatty(STDIN_FILENO)) {
-            char *prompt = "The best prompt ever> ";
+            char *prompt =
+            //  "     / \\__\n"
+            //                 "    (    @\\___\n"
+            //                 "     /         O\n"
+            //                 "    /   (_____/\n"
+            //                 "   /_____/   U\n";
+        //                     prompt =
+        "  /\\_/\\\n"
+        " ( o.o )\n"
+        "   >^<\n";
+
+        // "      \":\"\n    ___:____     |\"\\/\"|\n  ,'        `.    \\  /\n  |  O        \\___/  |\n~^~^~^~^~^~^~^~^~^~^~^~^~\n""🌊 Enter your command below! 🌊\n";
+        //  "┈┈╱▔▔▔▔▔▔▔▔▔▔▔▏\n┈╱╭▏╮╭┻┻╮╭┻┻╮╭▏\n▕╮╰▏╯┃╭╮┃┃╭╮┃╰▏\n▕╯┈▏┈┗┻┻┛┗┻┻┻╮▏\n▕╭╮▏╮┈┈┈┈┏━━━╯▏\n▕╰╯▏╯╰┳┳┳┳┳┳╯╭▏\n▕┈╭▏╭╮┃┗┛┗┛┃┈╰▏\n▕┈╰▏╰╯╰━━━━╯┈┈▏\n";
+        
             command = readline(prompt);
         }else {
             command = read_script();
@@ -184,20 +211,26 @@ int main(void)
 	    int commands = 0;
 
 	for (int i = 0; i < tokens; i++) {
-		if (strcmp(args[i], "|") == 0) {
-			// we need to create a new command
-			args[i] = NULL;
-			cmd_list[commands].stdout_pipe = true;
-			cmd_list[commands + 1].tokens = &args[i + 1];
-			commands++;
-        } else if (strcmp(args[i], "<") == 0) { // read input from a file
+        if (strcmp(args[i], "|") == 0) {
+            args[i] = NULL;
+            cmd_list[commands].stdout_pipe = true;
+            cmd_list[commands + 1].tokens = &args[i + 1];
+            commands++;
+        } else if (strcmp(args[i], "<") == 0) {
             args[i] = NULL;
             cmd_list[commands].stdin_file = args[i + 1];
             i++; // skip the file name in the next iteration
-        } else if (strcmp(args[i], ">") == 0) { // write output to a file
+        } else if (strcmp(args[i], ">") == 0) {
             args[i] = NULL;
             cmd_list[commands].stdout_file = args[i + 1];
+            // cmd_list[commands].stdout_pipe = false; // set to false for overwriting
             i++; // skip the file name in the next iteration
+        } else if (strcmp(args[i], ">>") == 0) {
+            args[i] = NULL;
+            cmd_list[commands].stdout_file = args[i + 1];
+            cmd_list[commands].stdout_pipe = false;
+            cmd_list[commands].stdout_append = true;
+            i++; // Skip the file name in the next iteration
         }
 	}
 
