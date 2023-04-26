@@ -136,12 +136,10 @@ char *read_script(void) {
 
 int main(void)
 {
-    // NOTE: "scripting" mode really just means reading from stdin
-    //       and NOT printing a whole bunch of junk (including the prompt)
     signal(SIGINT, SIG_IGN);
     rl_startup_hook = readline_init;
     hist_init(100);
-    char *command; //need to check isatty() if a person -> allows to type if not just reads command
+    char *command;
     while (true) 
     {
         if (isatty(STDIN_FILENO)) {
@@ -151,11 +149,10 @@ int main(void)
             //                 "     /         O\n"
             //                 "    /   (_____/\n"
             //                 "   /_____/   U\n";
-        //                     prompt =
-        "  /\\_/\\\n"
-        " ( o.o )\n"
-        "   >^<\n";
-
+        // "  /\\_/\\\n"
+        // " ( o.o )\n"
+        // "   >^<\n"
+        "🤔 > ";
         // "      \":\"\n    ___:____     |\"\\/\"|\n  ,'        `.    \\  /\n  |  O        \\___/  |\n~^~^~^~^~^~^~^~^~^~^~^~^~\n""🌊 Enter your command below! 🌊\n";
         //  "┈┈╱▔▔▔▔▔▔▔▔▔▔▔▏\n┈╱╭▏╮╭┻┻╮╭┻┻╮╭▏\n▕╮╰▏╯┃╭╮┃┃╭╮┃╰▏\n▕╯┈▏┈┗┻┻┛┗┻┻┻╮▏\n▕╭╮▏╮┈┈┈┈┏━━━╯▏\n▕╰╯▏╯╰┳┳┳┳┳┳╯╭▏\n▕┈╭▏╭╮┃┗┛┗┛┃┈╰▏\n▕┈╰▏╰╯╰━━━━╯┈┈▏\n";
         
@@ -201,7 +198,7 @@ int main(void)
         char *curr_tok; 
         char *og_tok = strdup(command); // need to save pointer to original token because command gets modified
         // tokenize command. ex: ls -l / => 'ls', 'l', '/', 'NULL'
-        while ((curr_tok = next_token(&next_tok, " \t\r\n")) != NULL) // handle for pipes
+        while ((curr_tok = next_token(&next_tok, " \t\r\n")) != NULL)
         {
 		    args[tokens++] = curr_tok;
 	    }
@@ -210,29 +207,28 @@ int main(void)
         cmd_list[0].tokens = &args[0]; // set first command to mem address of the first token in case there is no pipes
 	    int commands = 0;
 
-	for (int i = 0; i < tokens; i++) {
-        if (strcmp(args[i], "|") == 0) {
-            args[i] = NULL;
-            cmd_list[commands].stdout_pipe = true;
-            cmd_list[commands + 1].tokens = &args[i + 1];
-            commands++;
-        } else if (strcmp(args[i], "<") == 0) {
-            args[i] = NULL;
-            cmd_list[commands].stdin_file = args[i + 1];
-            i++; // skip the file name in the next iteration
-        } else if (strcmp(args[i], ">") == 0) {
-            args[i] = NULL;
-            cmd_list[commands].stdout_file = args[i + 1];
-            // cmd_list[commands].stdout_pipe = false; // set to false for overwriting
-            i++; // skip the file name in the next iteration
-        } else if (strcmp(args[i], ">>") == 0) {
-            args[i] = NULL;
-            cmd_list[commands].stdout_file = args[i + 1];
-            cmd_list[commands].stdout_pipe = false;
-            cmd_list[commands].stdout_append = true;
-            i++; // Skip the file name in the next iteration
+        for (int i = 0; i < tokens; i++) {
+            if (strcmp(args[i], "|") == 0) {
+                args[i] = NULL;
+                cmd_list[commands].stdout_pipe = true;
+                cmd_list[commands + 1].tokens = &args[i + 1];
+                commands++;
+            } else if (strcmp(args[i], "<") == 0) {
+                args[i] = NULL;
+                cmd_list[commands].stdin_file = args[i + 1];
+                i++; // skip the file name in the next iteration
+            } else if (strcmp(args[i], ">") == 0) {
+                args[i] = NULL;
+                cmd_list[commands].stdout_file = args[i + 1];
+                i++;
+            } else if (strcmp(args[i], ">>") == 0) {
+                args[i] = NULL;
+                cmd_list[commands].stdout_file = args[i + 1];
+                cmd_list[commands].stdout_pipe = false;
+                cmd_list[commands].stdout_append = true;
+                i++;
+            }
         }
-	}
 
         if (args[0] == (char *) NULL) { //blank command
             continue;
