@@ -17,14 +17,24 @@
 #include <signal.h>
 #include <time.h>
 
-const char *emojis[] = {"😂", "🤣", "😅", "😆", "😜", "😝", "😛", "🤪", "🤨", "🙃",
+char *emojis[] = {"😂", "🤣", "😅", "😆", "😜", "😝", "😛", "🤪", "🤨", "🙃",
     "🤓", "😎", "🥸", "🤩", "🥳", "😏", "😁", "😬", "🤭", "🤫",
     "🤔", "🤥", "🤯", "😵‍💫", "😵", "🥴", "😶‍🌫️", "😸", "😹", "😻",
     "🙀", "🤖", "👻", "💩", "🤡", "🥶", "🥵", "🤠", "🥺", "😺",
-    "😼", "🤑", "🤢", "🤮", "🤧", "🙄", "😋", "😙", "😗", "🧐"};
-const int emoji_count = sizeof(emojis) / sizeof(emojis[0]);
+    "😼", "🤑", "🤢", "🤮", "🤧", "🙄", "😋", "😙", "😗", "🧐"
+        "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇",
+    "😍", "😘", "😗", "😙", "😚", "🙂", "🙃", "😉", "😌", "😜",
+    "😝", "😛", "🤑", "🤗", "🤔", "🤐", "😶", "😏", "😒", "🙄",
+    "😬", "🤥", "😌", "😓", "😔", "😕", "😖", "🙁", "😫", "😩",
+    "😤", "😠", "😡", "😶", "😯", "😦", "😧", "😮", "😲", "😵",
+    "😳", "😱", "😨", "😰", "😢", "😥", "🤤", "😭", "😓", "😪",
+    "😴", "😷", "🤒", "🤕", "🤢", "🤧", "😵", "🤠", "🤡", "🤥",
+    "🤓", "😈", "👿", "👹", "👺", "💀", "👻", "👽", "🤖", "😺",
+    "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾", "👐", "🙌",
+    "👏", "🤝", "👍", "👎", "👊", "✊", "🤛", "🤜", "🤞", "✌️"};
+int emoji_count = sizeof(emojis) / sizeof(emojis[0]);
 int command_count = 0;
-const char *quotes[] = {
+char *quotes[] = {
         "The greatest glory in living lies not in never falling, but in rising every time we fall. - Nelson Mandela",
         "The way to get started is to quit talking and begin doing. - Walt Disney",
         "You have to expect things of yourself before you can do them. - Michael Jordan",
@@ -34,7 +44,7 @@ const char *quotes[] = {
         "Impossible is just a big word thrown around by small men who find it easier to live in the world they've been given than to explore the power they have to change it. - Muhammad Ali",
         "The most important thing is to try and inspire people so that they can be great in whatever they want to do. - Kobe Bryant"
     };
-const int quote_count = sizeof(quotes) / sizeof(quotes[0]);
+int quote_count = sizeof(quotes) / sizeof(quotes[0]);
 
 struct command_line {
     char **tokens;
@@ -49,12 +59,6 @@ int readline_init(void)
     rl_variable_bind("show-all-if-ambiguous", "on");
     rl_variable_bind("colored-completion-prefix", "on");
     return 0;
-}
-const char *get_random_quote() {
-
-    srand(time(NULL));
-    int index = rand() % quote_count;
-    return quotes[index];
 }
 
 /**
@@ -141,8 +145,13 @@ char *get_username() {
     return pw->pw_name;
 }
 
+char *get_random_quote() {
+    srand(time(NULL));
+    int index = rand() % quote_count;
+    return quotes[index];
+}
 
-const char *get_random_emoji() {
+char *get_random_emoji() {
     srand(time(NULL));
     int index = rand() % emoji_count;
     return emojis[index];
@@ -186,7 +195,7 @@ int main(void)
     while (true) 
     {
         if (isatty(STDIN_FILENO)) {
-            char prompt[PATH_MAX + 50];
+            char prompt[100];
             snprintf(prompt, sizeof(prompt), "[%s %s %s | Total Commands: %d] > ",
                                             get_random_emoji(), get_username(), get_current_date_time(), command_count++);
             command = readline(prompt);
@@ -269,7 +278,7 @@ int main(void)
             continue;
         }
         if (strcmp(args[0], "exit") == 0) {
-            fprintf(stderr, "%sThanks for using Digital DaSH! Here is an inspirational quote:\n%s %s\n",
+            fprintf(stderr, "%sThanks for using Digital DaSH! Have a great day!\n%s%s\n",
             get_random_emoji(), get_random_emoji(), get_random_quote());
             break;
         }
@@ -278,7 +287,7 @@ int main(void)
             if (args[1] == NULL) {
                 chdir(getenv("HOME")); // go to home directory if unspecified
             } else {
-                chdir(args[1]); // go to specified directory, i think it isn't working
+                chdir(args[1]); // go to specified directory
             }
         }
         hist_add(og_tok);
