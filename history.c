@@ -15,9 +15,6 @@ static struct historyEntry history[MAX_HISTORY_ENTRIES];
 static int history_count = 0;
 static int history_limit = MAX_HISTORY_ENTRIES;
 static int command_number = 0;
-// keep track of low and high index so that if it goes over 100, we can still get the command 
-// for example when we add the 101th elem, low index should become 1 and high index should become 100
-// need to increment accordingly 
 
 void hist_init(unsigned int max_limit)
 {
@@ -27,11 +24,11 @@ void hist_init(unsigned int max_limit)
     history_limit = max_limit;
 
 }
-// frees the entire history
+
 void hist_destroy(void)
 {
-    for(int i = 0; i < history_count; i++) {
-        free(history[i].command);
+    for(int i = 0; i < history_count; i++) { // go through entire array
+        free(history[i].command); // free each command
     }
 }
 
@@ -84,11 +81,11 @@ const char *hist_search_cnum(int command_number)
 {
     // TODO: Retrieves a particular command number. Return NULL if no match
     // found.
-    int index = command_number - history[0].number;
-    if (index >= 0 && index < history_count) {
+    int index = command_number - history[0].number; // find the corresponding index
+    if (index >= 0 && index < history_count) { // if in range
         return history[index].command; // return command
     }
-    return NULL;
+    return NULL; 
 }
 
 unsigned int hist_last_cnum(void)

@@ -15,6 +15,26 @@
 #include "history.h"
 #include "logger.h"
 #include <signal.h>
+#include <time.h>
+
+const char *emojis[] = {"😂", "🤣", "😅", "😆", "😜", "😝", "😛", "🤪", "🤨", "🙃",
+    "🤓", "😎", "🥸", "🤩", "🥳", "😏", "😁", "😬", "🤭", "🤫",
+    "🤔", "🤥", "🤯", "😵‍💫", "😵", "🥴", "😶‍🌫️", "😸", "😹", "😻",
+    "🙀", "🤖", "👻", "💩", "🤡", "🥶", "🥵", "🤠", "🥺", "😺",
+    "😼", "🤑", "🤢", "🤮", "🤧", "🙄", "😋", "😙", "😗", "🧐"};
+const int emoji_count = sizeof(emojis) / sizeof(emojis[0]);
+int command_count = 0;
+const char *quotes[] = {
+        "The greatest glory in living lies not in never falling, but in rising every time we fall. - Nelson Mandela",
+        "The way to get started is to quit talking and begin doing. - Walt Disney",
+        "You have to expect things of yourself before you can do them. - Michael Jordan",
+        "The only way to do great work is to love what you do. - Steve Jobs",
+        "You miss 100% of the shots you don't take. - Wayne Gretzky",
+        "In the end, it's not the years in your life that count. It's the life in your years. - Abraham Lincoln",
+        "Impossible is just a big word thrown around by small men who find it easier to live in the world they've been given than to explore the power they have to change it. - Muhammad Ali",
+        "The most important thing is to try and inspire people so that they can be great in whatever they want to do. - Kobe Bryant"
+    };
+const int quote_count = sizeof(quotes) / sizeof(quotes[0]);
 
 struct command_line {
     char **tokens;
@@ -29,6 +49,12 @@ int readline_init(void)
     rl_variable_bind("show-all-if-ambiguous", "on");
     rl_variable_bind("colored-completion-prefix", "on");
     return 0;
+}
+const char *get_random_quote() {
+
+    srand(time(NULL));
+    int index = rand() % quote_count;
+    return quotes[index];
 }
 
 /**
@@ -80,7 +106,7 @@ void execute_pipeline(struct command_line *cmds)
 {
     LOG("exec: %s\n", cmds[0].tokens[0]);
     int i = 0;
-    while (cmds[i].stdout_pipe == true) { // needs to run for each command
+    while (cmds[i].stdout_pipe) { // needs to run for each command
         int fd[2];
         pipe(fd);
         pid_t pid = fork();
@@ -94,26 +120,43 @@ void execute_pipeline(struct command_line *cmds)
         }
         i++;
     }
-
-    if (cmds[i].stdout_append) {
+    if (cmds[i].stdout_append) { 
         int output = open(cmds[i].stdout_file, O_CREAT | O_WRONLY | O_APPEND, 0666);
         dup2(output, STDOUT_FILENO);
-        close(output);
-    } else if (cmds[i].stdout_file) {
+    } else if (cmds[i].stdout_file) { 
         int output = open(cmds[i].stdout_file, O_CREAT | O_WRONLY | O_TRUNC, 0666);
         dup2(output, STDOUT_FILENO);
-        close(output);
     }
 
-    if (cmds[i].stdin_file) {
+    if (cmds[i].stdin_file) { 
         int input = open(cmds[i].stdin_file, O_RDONLY);
         dup2(input, STDIN_FILENO);
-        close(input);
     }
 
     execvp(cmds[i].tokens[0], cmds[i].tokens);
 }
 
+char *get_username() {
+    struct passwd *pw = getpwuid(getuid());
+    return pw->pw_name;
+}
+
+
+const char *get_random_emoji() {
+    srand(time(NULL));
+    int index = rand() % emoji_count;
+    return emojis[index];
+}
+
+char *get_current_date_time() {
+    time_t rawtime;
+    struct tm *timeinfo;
+    static char date_time_str[20];
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    strftime(date_time_str, sizeof(date_time_str), "%Y-%m-%d %H:%M:%S", timeinfo);
+    return date_time_str;
+}
 
 char *read_script(void) {
     char *line_ptr = NULL; // buffer(temporary storage) for storing the line
@@ -143,19 +186,9 @@ int main(void)
     while (true) 
     {
         if (isatty(STDIN_FILENO)) {
-            char *prompt =
-            //  "     / \\__\n"
-            //                 "    (    @\\___\n"
-            //                 "     /         O\n"
-            //                 "    /   (_____/\n"
-            //                 "   /_____/   U\n";
-        // "  /\\_/\\\n"
-        // " ( o.o )\n"
-        // "   >^<\n"
-        "🤔 > ";
-        // "      \":\"\n    ___:____     |\"\\/\"|\n  ,'        `.    \\  /\n  |  O        \\___/  |\n~^~^~^~^~^~^~^~^~^~^~^~^~\n""🌊 Enter your command below! 🌊\n";
-        //  "┈┈╱▔▔▔▔▔▔▔▔▔▔▔▏\n┈╱╭▏╮╭┻┻╮╭┻┻╮╭▏\n▕╮╰▏╯┃╭╮┃┃╭╮┃╰▏\n▕╯┈▏┈┗┻┻┛┗┻┻┻╮▏\n▕╭╮▏╮┈┈┈┈┏━━━╯▏\n▕╰╯▏╯╰┳┳┳┳┳┳╯╭▏\n▕┈╭▏╭╮┃┗┛┗┛┃┈╰▏\n▕┈╰▏╰╯╰━━━━╯┈┈▏\n";
-        
+            char prompt[PATH_MAX + 50];
+            snprintf(prompt, sizeof(prompt), "[%s %s %s | Total Commands: %d] > ",
+                                            get_random_emoji(), get_username(), get_current_date_time(), command_count++);
             command = readline(prompt);
         }else {
             command = read_script();
@@ -211,11 +244,11 @@ int main(void)
             if (strcmp(args[i], "|") == 0) {
                 args[i] = NULL;
                 cmd_list[commands].stdout_pipe = true;
-                cmd_list[commands + 1].tokens = &args[i + 1];
+                cmd_list[commands + 1].tokens = &args[i + 1]; // echo null ls
                 commands++;
             } else if (strcmp(args[i], "<") == 0) {
                 args[i] = NULL;
-                cmd_list[commands].stdin_file = args[i + 1];
+                cmd_list[commands].stdin_file = args[i + 1];// hello > file null
                 i++; // skip the file name in the next iteration
             } else if (strcmp(args[i], ">") == 0) {
                 args[i] = NULL;
@@ -231,10 +264,13 @@ int main(void)
         }
 
         if (args[0] == (char *) NULL) { //blank command
+            free(command);
+            free(og_tok);
             continue;
         }
         if (strcmp(args[0], "exit") == 0) {
-            fprintf(stderr, "Have a great day, bye!\n");
+            fprintf(stderr, "%sThanks for using Digital DaSH! Here is an inspirational quote:\n%s %s\n",
+            get_random_emoji(), get_random_emoji(), get_random_quote());
             break;
         }
         // chdir system call
@@ -245,9 +281,8 @@ int main(void)
                 chdir(args[1]); // go to specified directory, i think it isn't working
             }
         }
-        // LOG("og command: %s\n", og_tok);
         hist_add(og_tok);
-        // history --- want to print after we added all tokens
+        // history
         if (strcmp(args[0], "history") == 0) {
             hist_print();
         }
@@ -262,8 +297,9 @@ int main(void)
             return EXIT_FAILURE;
         } else {
             int status;
-            wait(&status); // what is going on here?
+            wait(&status); 
         }
+        free(og_tok);
         free(command);
     }
     hist_destroy();
