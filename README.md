@@ -1,25 +1,28 @@
 # Project 3: Command Line Shell
+This project is a custom shell implementation designed to provide an interactive command-line interface for executing commands, managing I/O redirection, piping, and maintaining command history. It allows users to enter commands at a prompt, which are then parsed into tokens and executed.The shell handles basic commands and offers the ability to search and recall previous commands through its command history functionality. The shell is built around a main loop that continuously reads user input, tokenizes it, and processes commands accordingly. It supports I/O redirection using the '<', '>', and '>>' operators, thus allowing users to direct the input and output of commands to and from files. Some additional features I added are a custom prompt that includes a random emoji, the username, the current date and time, and the total number of commands executed so far. Additionally, when the user types 'exit, the shell prints a farewell message with a random emoji and an inspirational quote before closing.
 
-See: https://www.cs.usfca.edu/~mmalensek/cs521/assignments/project-3.html
+The prompt has the following items:
 
-TODO: Remove the link above. Your README should not depend on a link to the spec.
+* Item1: Random Emoji
+* Item2: Username
+* Item3: Current Date and Time
+* Item4: Number of Commands Executed so far
 
-TODO: Replace this section with a short (1-3 paragraph) description of the project. What it does, how it does it, and any features that stand out. If you ever need to refer back to this project, the description should jog your memory.
+And it looks like this:
+
+PROMPT: [🤓 nesaar 2023-04-26 22:28:10 | Total Commands: 0] > 
 
 ## Building
-
-TODO: Update this section as necessary.
-
 To compile and run:
 
 ```bash
 make
-./program_name
+./digitaldash
 ```
 
 ## Running + Example Usage
 
-TODO: add a screenshot / text of a demo run of your program here.
+add a screenshot / text of a demo run of your program here. 
 
 ## Testing
 
